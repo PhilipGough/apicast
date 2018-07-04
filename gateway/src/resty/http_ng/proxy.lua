@@ -1,5 +1,9 @@
 local next = next
 local resty_env = require 'resty.env'
+local http = require "resty.http"
+local resty_url = require "resty.url"
+local balancer = require 'apicast.balancer'
+local format = string.format
 
 local proxy_options
 
@@ -26,6 +30,49 @@ function _M.reset()
     _M.set(_M.env())
 
     return _M
+end
+
+local function upstream_server()
+    local u = ngx.ctx.upstream_server
+    local port = u.port
+    if port == resty_url.default_port(u.scheme) then
+        port = ''
+    else
+        port = format(':%s', port)
+    end
+
+    local path = u.path
+
+    if path == '' or path == nil then
+        path = format('%s%s%s', ngx.var.uri, ngx.var.is_args, ngx.var.query_string)
+    end
+
+    return format('%s://%s%s%s', u.scheme, u.server, port, path or '/')
+end
+
+function _M.request(url)
+    local httpc = http.new()
+
+    httpc:set_proxy_options(_M.options())
+
+    local uri = resty_url.parse(url)
+    local proxy_uri = httpc:get_proxy_uri(uri.scheme, uri.host)
+
+    if not proxy_uri then return nil, 'no_proxy' end
+
+    local ok, err = httpc:connect_proxy(proxy_uri, uri.scheme, uri.host, uri.port)
+
+    if ok then
+        httpc:proxy_response(httpc:request{
+            method = ngx.req.get_method(),
+            headers = ngx.req.get_headers(),
+            path = upstream_server(),
+            body = httpc:get_client_body_reader(),
+        })
+        return true
+    else
+        return nil, err
+    end
 end
 
 return _M.reset()

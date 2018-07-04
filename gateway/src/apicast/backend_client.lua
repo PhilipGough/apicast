@@ -106,7 +106,7 @@ local function call_backend_transaction(self, path, options, ...)
   local url = build_url(self, path, ...)
   local res = http_client.get(url, options)
 
-  ngx.log(ngx.INFO, 'backend client uri: ', url, ' ok: ', res.ok, ' status: ', res.status, ' body: ', res.body)
+  ngx.log(ngx.INFO, 'backend client uri: ', url, ' ok: ', res.ok, ' status: ', res.status, ' body: ', res.body, ' error: ', res.error)
 
   return res
 end

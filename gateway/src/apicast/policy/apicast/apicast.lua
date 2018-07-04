@@ -1,4 +1,5 @@
 local balancer = require('apicast.balancer')
+local proxy = require('resty.http_ng.proxy')
 local math = math
 local setmetatable = setmetatable
 
@@ -81,7 +82,13 @@ function _M:access(context)
 end
 
 _M.content = function()
-  if not ngx.headers_sent then
+  if ngx.headers_sent then return end
+
+  if proxy.active then
+    if not proxy.request(ngx.var.proxy_pass) then
+      ngx.exec("@upstream")
+    end
+  else
     ngx.exec("@upstream")
   end
 end

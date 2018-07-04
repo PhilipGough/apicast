@@ -26,7 +26,6 @@ local ipairs = ipairs
 local encode_args = ngx.encode_args
 local resty_resolver = require 'resty.resolver'
 local backend_client = require('apicast.backend_client')
-local http_ng_ngx = require('resty.http_ng.backend.ngx')
 
 local response_codes = env.enabled('APICAST_RESPONSE_CODES')
 local reporting_executor = require('resty.concurrent.immediate_executor')
@@ -144,7 +143,7 @@ function _M:authorize(service, usage, credentials, ttl)
     -- set cached_key to nil to avoid doing the authrep in post_action
     ngx.var.cached_key = nil
 
-    local backend = assert(backend_client:new(service, http_ng_ngx), 'missing backend')
+    local backend = assert(backend_client:new(service), 'missing backend')
     local res = backend:authrep(formatted_usage, credentials, self.extra_params_backend_authrep)
 
     local authorized, rejection_reason = self:handle_backend_response(cached_key, res, ttl)
@@ -185,13 +184,16 @@ function _M.get_upstream(service)
     server = host,
     host = service.hostname_rewrite or host,
     uri  = scheme .. '://upstream' .. path,
-    port = tonumber(port)
+    port = tonumber(port),
+    scheme = scheme,
+    path = path,
   }
 end
 
 function _M.set_upstream(service)
   local upstream = _M.get_upstream(service)
 
+  ngx.ctx.upstream_server = upstream
   ngx.ctx.upstream = resty_resolver:instance():get_servers(upstream.server, { port = upstream.port })
 
   ngx.var.proxy_pass = upstream.uri
@@ -314,9 +316,7 @@ end
 -- on rewrite, access and content phases. We need to use cosockets (http_ng default backend)
 -- everywhere else (like timers).
 local http_ng_backend_phase = {
-  access = http_ng_ngx,
-  rewrite = http_ng_ngx,
-  content = http_ng_ngx,
+
 }
 
 local function build_backend_client(service)
