@@ -13,9 +13,12 @@ local _M = {}
 
 local response = require 'resty.http_ng.response'
 local http = require 'resty.resolver.http'
+local proxy = require 'resty.http_ng.proxy'
 
 _M.async = function(request)
   local httpc = http.new()
+
+  httpc:set_proxy_options(proxy.options())
 
   local parsed_uri = assert(httpc:parse_uri(assert(request.url, 'missing url')))
 
@@ -40,7 +43,15 @@ _M.async = function(request)
     end
   end
 
-  local ok, err = httpc:connect(host, port)
+
+  local proxy_uri = httpc:get_proxy_uri(scheme, host)
+  local ok, err
+
+  if proxy_uri then
+    ok, err = httpc:connect_proxy(proxy_uri, scheme, host, port)
+  else
+    ok, err = httpc:connect(host, port)
+  end
 
   if not ok then
     return response.error(request, err)

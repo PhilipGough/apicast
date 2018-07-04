@@ -1,5 +1,6 @@
 local backend = {}
 local response = require 'resty.http_ng.response'
+local proxy = require 'resty.http_ng.proxy'
 
 local METHODS = {
   ["GET"]      = ngx.HTTP_GET,
@@ -17,6 +18,10 @@ local ngx_re = require("ngx.re")
 
 backend.capture = ngx.location.capture
 backend.send = function(_, request)
+  if proxy.active then
+    return response.error(request, 'ngx backend does not support proxy')
+  end
+
   local res = backend.capture(PROXY_LOCATION, {
     method = METHODS[request.method],
     body = request.body,
