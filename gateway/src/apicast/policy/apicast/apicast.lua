@@ -81,15 +81,13 @@ function _M:access(context)
   end
 end
 
-_M.content = function()
+_M.content = function(_, context)
   if ngx.headers_sent then return end
 
   if proxy.active then
-    if not proxy.request(ngx.var.proxy_pass) then
-      ngx.exec("@upstream")
-    end
+    return proxy.request(ngx.var.proxy_pass)
   else
-    ngx.exec("@upstream")
+    return ngx.exec("@upstream")
   end
 end
 

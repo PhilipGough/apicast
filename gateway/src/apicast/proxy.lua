@@ -26,6 +26,8 @@ local ipairs = ipairs
 local encode_args = ngx.encode_args
 local resty_resolver = require 'resty.resolver'
 local backend_client = require('apicast.backend_client')
+local http_proxy = require('resty.http_ng.proxy').init()
+local http_ng_ngx = require('resty.http_ng.backend.ngx')
 
 local response_codes = env.enabled('APICAST_RESPONSE_CODES')
 local reporting_executor = require('resty.concurrent.immediate_executor')
@@ -67,6 +69,7 @@ function _M.new(configuration)
     configuration = assert(configuration, 'missing proxy configuration'),
     cache = cache,
     cache_handler = cache_handler,
+    http_ng_backend = http_proxy.http_backend,
 
     -- Params to send in 3scale backend calls that are not the typical ones
     -- (credentials, usage, etc.).
@@ -116,6 +119,20 @@ local function matched_patterns(matched_rules)
   return patterns
 end
 
+
+-- resty.http_ng.backend.ngx is using ngx.location.capture, which is available only
+-- on rewrite, access and content phases. We need to use cosockets (http_ng default backend)
+-- everywhere else (like timers).
+local http_ng_backend_phase = {
+  access = http_ng_ngx,
+  rewrite = http_ng_ngx,
+  content = http_ng_ngx,
+}
+
+local function build_backend_client(self, service)
+  return assert(backend_client:new(service, self.http_ng_backend or http_ng_backend_phase[ngx.get_phase()]), 'missing backend')
+end
+
 function _M:authorize(service, usage, credentials, ttl)
   if not usage or not credentials then return nil, 'missing usage or credentials' end
 
@@ -143,7 +160,7 @@ function _M:authorize(service, usage, credentials, ttl)
     -- set cached_key to nil to avoid doing the authrep in post_action
     ngx.var.cached_key = nil
 
-    local backend = assert(backend_client:new(service), 'missing backend')
+    local backend = build_backend_client(self, service)
     local res = backend:authrep(formatted_usage, credentials, self.extra_params_backend_authrep)
 
     local authorized, rejection_reason = self:handle_backend_response(cached_key, res, ttl)
@@ -312,19 +329,8 @@ local function response_codes_data()
   return params
 end
 
--- resty.http_ng.backend.ngx is using ngx.location.capture, which is available only
--- on rewrite, access and content phases. We need to use cosockets (http_ng default backend)
--- everywhere else (like timers).
-local http_ng_backend_phase = {
-
-}
-
-local function build_backend_client(service)
-  return backend_client:new(service, http_ng_backend_phase[ngx.get_phase()])
-end
-
 local function post_action(self, cached_key, service, credentials, formatted_usage)
-  local backend = assert(build_backend_client(service), 'missing backend')
+  local backend = build_backend_client(self, service)
   local res = backend:authrep(
           formatted_usage,
           credentials,

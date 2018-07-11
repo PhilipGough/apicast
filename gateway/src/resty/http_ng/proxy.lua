@@ -1,8 +1,7 @@
 local next = next
 local resty_env = require 'resty.env'
-local http = require "resty.http"
+local http = require 'resty.http'
 local resty_url = require "resty.url"
-local balancer = require 'apicast.balancer'
 local format = string.format
 
 local proxy_options
@@ -10,12 +9,22 @@ local proxy_options
 local _M = { }
 
 function _M.options()
+    _M.init()
     return proxy_options
+end
+
+function _M.init()
+    if not proxy_options then
+        _M.reset()
+    end
+
+    return _M
 end
 
 function _M.set(options)
     proxy_options = options
     _M.active = not not next(options)
+    _M.http_backend = require('resty.http_ng.backend.resty')
 end
 
 function _M.env()
@@ -65,14 +74,15 @@ function _M.request(url)
     if ok then
         httpc:proxy_response(httpc:request{
             method = ngx.req.get_method(),
-            headers = ngx.req.get_headers(),
+            headers = ngx.req.get_headers(0, true),
             path = upstream_server(),
             body = httpc:get_client_body_reader(),
         })
         return true
     else
-        return nil, err
+        ngx.log(ngx.ERR, 'could not connect to proxy: ',  proxy_uri, ' err: ', err)
+        return ngx.exit(499)
     end
 end
 
-return _M.reset()
+return _M

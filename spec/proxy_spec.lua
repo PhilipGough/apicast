@@ -4,13 +4,16 @@ local lrucache = require('resty.lrucache')
 local configuration_store = require 'apicast.configuration_store'
 local Service = require 'apicast.configuration.service'
 local Usage = require 'apicast.usage'
+local test_backend_client = require 'resty.http_ng.backend.test'
 
 describe('Proxy', function()
-  local configuration, proxy
+  local configuration, proxy, test_backend
 
   before_each(function()
     configuration = configuration_store.new()
     proxy = require('apicast.proxy').new(configuration)
+    test_backend = test_backend_client.new()
+    proxy.http_ng_backend = test_backend
   end)
 
   it('has access function', function()
@@ -57,14 +60,12 @@ describe('Proxy', function()
   describe('.authorize', function()
     local service = { backend_authentication = { value = 'not_baz' }, backend = { endpoint = 'http://0.0.0.0' } }
 
-    local ngx_backend = require('resty.http_ng.backend.ngx')
-
     it('takes ttl value if sent', function()
       local ttl = 80
       ngx.var = { cached_key = 'client_id=blah', http_x_3scale_debug='baz', real_url='blah' }
 
       local response = { status = 200 }
-      stub(ngx_backend, 'send', function() return response end)
+      stub(test_backend, 'send', function() return response end)
 
       stub(proxy, 'cache_handler').returns(true)
 
@@ -80,7 +81,7 @@ describe('Proxy', function()
       ngx.var = { cached_key = "client_id=blah", http_x_3scale_debug='baz', real_url='blah' }
 
       local response = { status = 200 }
-      stub(ngx_backend, 'send', function() return response end)
+      stub(test_backend, 'send', function() return response end)
       stub(proxy, 'cache_handler').returns(true)
 
       local usage = Usage.new()
