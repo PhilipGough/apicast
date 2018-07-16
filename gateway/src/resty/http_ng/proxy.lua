@@ -56,28 +56,36 @@ local function upstream_server()
         path = format('%s%s%s', ngx.var.uri, ngx.var.is_args, ngx.var.query_string)
     end
 
-    return format('%s://%s%s%s', u.scheme, u.server, port, path or '/')
+    return format('%s://%s%s%s', u.scheme, u.server, port, path or '/'), path
 end
 
-function _M.request(url)
+function _M.request()
     local httpc = http.new()
 
     httpc:set_proxy_options(_M.options())
 
+    local url, path = upstream_server()
     local uri = resty_url.parse(url)
     local proxy_uri = httpc:get_proxy_uri(uri.scheme, uri.host)
 
     if not proxy_uri then return nil, 'no_proxy' end
 
-    local ok, err = httpc:connect_proxy(proxy_uri, uri.scheme, uri.host, uri.port)
+    local ok, err = httpc:connect_proxy(proxy_uri, uri.scheme, uri.host, uri.port or resty_url.default_port(uri.scheme))
+
+    if uri.scheme == 'https' then
+        assert(httpc:ssl_handshake(nil, uri.host, true))
+    end
 
     if ok then
         httpc:proxy_response(httpc:request{
             method = ngx.req.get_method(),
             headers = ngx.req.get_headers(0, true),
-            path = upstream_server(),
+            path = uri.scheme == 'https' and path or url,
             body = httpc:get_client_body_reader(),
         })
+
+        httpc:close()
+
         return true
     else
         ngx.log(ngx.ERR, 'could not connect to proxy: ',  proxy_uri, ' err: ', err)
