@@ -18,7 +18,7 @@ function _M.new()
   return setmetatable(http, mt)
 end
 
-function _M.connect(self, host, port)
+function _M:resolve(host, port)
   local resolver = self.resolver
   local balancer = self.balancer
 
@@ -33,10 +33,15 @@ function _M.connect(self, host, port)
   local ip = host
 
   if peer then
-    ip, port = unpack(peer)
+    ip, port = peer[1], peer[2]
   end
 
-  local ok, err = resty_http.connect(self, ip, port)
+  return ip, port
+end
+
+function _M.connect(self, host, port)
+  local ip, p = self:resolve(host, port)
+  local ok, err = resty_http.connect(self, ip, p or port)
 
   self.host = host
 

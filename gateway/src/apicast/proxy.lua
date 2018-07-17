@@ -204,6 +204,7 @@ function _M.get_upstream(service)
     port = tonumber(port),
     scheme = scheme,
     path = path,
+    name = '@upstream',
   }
 end
 

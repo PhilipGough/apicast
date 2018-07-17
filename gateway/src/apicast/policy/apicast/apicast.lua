@@ -85,10 +85,10 @@ _M.content = function(_, context)
   if ngx.headers_sent then return end
 
   if proxy.active then
-    return proxy.request(ngx.var.proxy_pass)
-  else
-    return ngx.exec("@upstream")
+    return proxy.request()
   end
+
+  return ngx.exec(ngx.ctx.upstream_server.name)
 end
 
 _M.balancer = balancer.call
