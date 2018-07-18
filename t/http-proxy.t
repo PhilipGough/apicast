@@ -48,25 +48,22 @@ GET /?user_key=value
 yay, api backend: test
 --- error_code: 200
 --- error_log
-apicast cache miss key: 42:value:usage%5Bhits%5D=2
+proxy request: GET http://127.0.0.1:1984/transactions/authrep.xml?service_token=token-value&service_id=42&usage%5Bhits%5D=2&user_key=value HTTP/1.1
 --- no_error_log
 [error]
 
-=== TEST 1: upstream API connection uses proxy
+=== TEST 2: upstream API connection uses proxy
 --- env eval
 ("http_proxy", $ENV{TEST_NGINX_HTTP_PROXY})
 --- configuration
 {
   "services": [
     {
-      "id": 42,
       "backend_version":  1,
-      "backend_authentication_type": "service_token",
-      "backend_authentication_value": "token-value",
       "proxy": {
         "api_backend": "http://test:$TEST_NGINX_SERVER_PORT/",
         "proxy_rules": [
-          { "pattern": "/", "http_method": "GET", "metric_system_name": "hits", "delta": 2 }
+          { "pattern": "/test", "http_method": "GET", "metric_system_name": "hits", "delta": 2 }
         ]
       }
     }
@@ -75,61 +72,56 @@ apicast cache miss key: 42:value:usage%5Bhits%5D=2
 --- backend
   location /transactions/authrep.xml {
     content_by_lua_block {
-      local expected = "service_token=token-value&service_id=42&usage%5Bhits%5D=2&user_key=value"
-      require('luassert').same(ngx.decode_args(expected), ngx.req.get_uri_args(0))
+      ngx.exit(ngx.OK)
     }
   }
 --- upstream
-  location / {
-     echo 'yay, api backend: $http_host';
+  location /test {
+     echo 'yay, api backend: $http_host, uri: $uri, is_args: $is_args, args: $args';
   }
 --- request
-GET /?user_key=value
+GET /test?user_key=value
 --- response_body
-yay, api backend: test
+yay, api backend: test, uri: /test?user_key=value, is_args: ?, args: user_key=value
 --- error_code: 200
 --- error_log
-apicast cache miss key: 42:value:usage%5Bhits%5D=2
+proxy request: GET http://127.0.0.1:1984/test%3Fuser_key=value?user_key=value HTTP/1.1
 --- no_error_log
 [error]
 
-=== TEST 1: Upstream Policy connection uses proxy
+=== TEST 3: Upstream Policy connection uses proxy
+--- SKIP
 --- env eval
 ("http_proxy", $ENV{TEST_NGINX_HTTP_PROXY})
 --- configuration
 {
   "services": [
     {
-      "id": 42,
-      "backend_version":  1,
-      "backend_authentication_type": "service_token",
-      "backend_authentication_value": "token-value",
       "proxy": {
-        "api_backend": "http://test:$TEST_NGINX_SERVER_PORT/",
-        "proxy_rules": [
-          { "pattern": "/", "http_method": "GET", "metric_system_name": "hits", "delta": 2 }
+        "policy_chain": [
+          { "name": "apicast.policy.upstream",
+            "configuration":
+              {
+                "rules": [ { "regex": "/test", "url": "http://echo" } ]
+              }
+          }
         ]
       }
     }
   ]
 }
---- backend
-  location /transactions/authrep.xml {
-    content_by_lua_block {
-      local expected = "service_token=token-value&service_id=42&usage%5Bhits%5D=2&user_key=value"
-      require('luassert').same(ngx.decode_args(expected), ngx.req.get_uri_args(0))
-    }
-  }
 --- upstream
-  location / {
+  location /test {
      echo 'yay, api backend: $http_host';
   }
 --- request
-GET /?user_key=value
+GET /test?user_key=value
 --- response_body
-yay, api backend: test
+GET /test?user_key=value HTTP/1.1
+X-Real-IP: 127.0.0.1
+Host: echo
 --- error_code: 200
 --- error_log
-apicast cache miss key: 42:value:usage%5Bhits%5D=2
+proxy request: GET http://127.0.0.1:1984/test%3Fuser_key=value?user_key=value HTTP/1.1
 --- no_error_log
 [error]

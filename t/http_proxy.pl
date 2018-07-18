@@ -7,34 +7,39 @@ $ENV{TEST_NGINX_HTTP_PROXY_PORT} = Test::APIcast->get_random_port();
 $ENV{TEST_NGINX_HTTP_PROXY} = "http://$Test::Nginx::Util::ServerAddr:$ENV{TEST_NGINX_HTTP_PROXY_PORT}";
 $ENV{TEST_NGINX_HTTPS_PROXY} = "http://$Test::Nginx::Util::ServerAddr:$ENV{TEST_NGINX_HTTP_PROXY_PORT}";
 
-add_block_preprocessor(sub {
-    my $block = shift;
+Test::Nginx::Socket::set_http_config_filter(sub {
+    my $config = shift;
 
-    if ($http_proxy_pid) {
-        kill INT => $http_proxy_pid;
-        waitpid($http_proxy_pid, 0);
-        $http_proxy_pid = 0;
+    if (defined $http_proxy_pid) {
+        # reload proxy to reopen log file
+        kill 'HUP', $http_proxy_pid;
     }
 
-    if ($http_proxy_pid = fork) {
-        sleep( Test::Nginx::Util->sleep_time() );
-    } else {
+    return $config;
+});
 
-        my ($proxy_config, $proxy_config_file) = tempfile();
+if ($http_proxy_pid = fork) {
+    if ($Test::Nginx::Util::Verbose) {
+        warn "started proxy process $http_proxy_pid";
+    }
 
-        print $proxy_config Test::Nginx::Util::expand_env_in_config <<'NGINX';
+    sleep( Test::Nginx::Util->sleep_time() );
+} else {
+    my $err_log_file = $Test::Nginx::Util::ErrLogFile;
+    my ($proxy_config, $proxy_config_file) = tempfile();
+
+    print $proxy_config Test::Nginx::Util::expand_env_in_config <<'NGINX';
 daemon off;
 
 events {
     worker_connections 1024;
 }
 
-error_log stderr debug;
-
 stream {
     lua_code_cache on;
 
     resolver local=on;
+    init_worker_by_lua_block { ngx.log(ngx.INFO, 'started proxy worker') }
 
     # define a TCP server listening on the port 1234:
     server {
@@ -254,18 +259,18 @@ end
     }
 }
 NGINX
-        close $proxy_config;
-        warn($proxy_config_file);
-        exec("$Test::Nginx::Util::NginxBinary",
-            '-p', $Test::Nginx::Util::ServRoot,
-            '-c', $proxy_config_file,
-            # '-g', "error_log $Test::Nginx::Util::ErrLogFile $Test::Nginx::Util::LogLevel;"
-        );
-    }
-});
+    close $proxy_config;
+    warn($proxy_config_file);
+    exec("$Test::Nginx::Util::NginxBinary",
+        '-p', $Test::Nginx::Util::ServRoot,
+        '-c', $proxy_config_file,
+        '-g', "error_log $err_log_file $Test::Nginx::Util::LogLevel;"
+    );
+}
 
 add_cleanup_handler(sub {
-    if ($http_proxy_pid) {
-        kill INT => $http_proxy_pid;
+    if (defined $http_proxy_pid) {
+        Test::Nginx::Util::kill_process($http_proxy_pid, 1, 'proxy');
+        undef $http_proxy_pid;
     }
 });
