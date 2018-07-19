@@ -35,9 +35,14 @@ end
 
 local function connect(httpc, request)
   local uri = request.uri
-  local ok, err = httpc:connect(uri.host, uri.port)
+  local ok, err = httpc:connect(uri.host, uri.port or resty_url.default_port(uri.scheme))
 
   if not ok then return nil, err end
+
+  if uri.scheme == 'https' then
+    ok, err = httpc:ssl_handshake(nil, uri.host, request.ssl_verify)
+    if not ok then return nil, err end
+  end
 
   return httpc
 end

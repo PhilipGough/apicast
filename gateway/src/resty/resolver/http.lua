@@ -43,7 +43,10 @@ function _M.connect(self, host, port)
   local ip, p = self:resolve(host, port)
   local ok, err = resty_http.connect(self, ip, p or port)
 
-  self.host = host
+  if ok then
+    self.host = host
+    self.port = p or port
+  end
 
   return ok, err
 end
