@@ -15,11 +15,18 @@ local function exit_service_unavailable()
   ngx.exit(ngx.status)
 end
 
-function _M.call(_, _, balancer)
-  balancer = balancer or _M.default_balancer
-  local host = ngx.var.proxy_host -- NYI: return to lower frame
-  local peers = balancer:peers(ngx.ctx[host])
+function _M.call(_, context, balancer)
 
+  balancer = balancer or _M.default_balancer
+  local upstream = context.upstream
+  local host = ngx.var.proxy_host -- NYI: return to lower frame
+
+  if host ~= upstream.upstream_name then
+    ngx.log(ngx.ERR, 'upstream name: ', upstream.name, ' does not match proxy host: ', host)
+    return nil, 'upstream host mismatch'
+  end
+
+  local peers = balancer:peers(upstream.servers)
   local peer, err = balancer:select_peer(peers)
 
   if not peer then
