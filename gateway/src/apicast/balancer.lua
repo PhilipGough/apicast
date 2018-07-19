@@ -15,10 +15,14 @@ local function exit_service_unavailable()
   ngx.exit(ngx.status)
 end
 
-function _M.call(_, context, balancer)
-
-  balancer = balancer or _M.default_balancer
+function _M:call(context, bal)
+  local balancer = bal or _M.default_balancer
   local upstream = context.upstream
+
+  if context[upstream] then
+    return nil, 'already set peer'
+  end
+
   local host = ngx.var.proxy_host -- NYI: return to lower frame
 
   if host ~= upstream.upstream_name then
@@ -48,12 +52,15 @@ function _M.call(_, context, balancer)
   local ok
   ok, err = balancer.balancer.set_current_peer(address, port)
 
-  if not ok then
+  if ok then
+    ngx.log(ngx.INFO, 'balancer set peer ', address, ':', port)
+    -- I wish there would be a nicer way, but unfortunately ngx.exit(ngx.OK) does not
+    -- terminate the current phase handler and will evaluate all remaining balancer phases.
+    context[upstream] = peer
+  else
     ngx.log(ngx.ERR, 'failed to set current backend peer: ', err)
     return exit_service_unavailable()
   end
-
-  ngx.log(ngx.INFO, 'balancer set peer ', address, ':', port)
 end
 
 return _M
