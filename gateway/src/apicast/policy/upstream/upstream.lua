@@ -69,12 +69,14 @@ function _M:rewrite(context)
   end
 end
 
-function _M.content(_, context)
+function _M:content(context)
   local upstream = context[self]
 
   if upstream then
     upstream:rewrite()
     upstream:call(context)
+  else
+    return nil, 'no upstream'
   end
 end
 
