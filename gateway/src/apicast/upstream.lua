@@ -19,7 +19,7 @@ local function proxy_pass(upstream)
             upstream.upstream_name,
             uri.path or ngx.var.uri,
             ngx.var.is_args,
-            ngx.var.query_string)
+            ngx.var.query_string or '')
 end
 
 local mt = {
@@ -59,21 +59,26 @@ function _M.new(url)
     }, mt)
 end
 
-function _M:resolve()
+function _M:resolve(servers)
     local resolver = self.resolver
     local uri = self.uri
 
+    if servers then
+        self.servers = servers
+        return servers
+    end
+
     if not resolver or not uri then return nil, 'not initialized' end
 
-    local servers, err = resolver:get_servers(uri.host, { port = uri.port or resty_url.default_port(uri.scheme) })
+    local res, err = resolver:get_servers(uri.host, { port = uri.port or resty_url.default_port(uri.scheme) })
 
     if err then
         return nil, err
     end
 
-    self.servers = servers
+    self.servers = res
 
-    return servers
+    return res
 end
 
 function _M:port()
@@ -90,7 +95,10 @@ end
 
 local function exec(self)
     ngx.var.proxy_pass = proxy_pass(self)
-    ngx.exec(self.location_name)
+
+    if self.location_name then
+        ngx.exec(self.location_name)
+    end
 end
 
 function _M:call(context)
@@ -98,7 +106,7 @@ function _M:call(context)
 
     if not self.servers then self:resolve() end
 
-    context.upstream = self
+    context[self.upstream_name] = self
 
     return exec(self)
 end

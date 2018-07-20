@@ -9,8 +9,13 @@ local function exit_service_unavailable()
 end
 
 function _M:call(context, bal)
+  if not context then
+    return nil, 'missing context'
+  end
+
+  local host = ngx.var.proxy_host
   local balancer = bal or _M.default_balancer
-  local upstream = context.upstream
+  local upstream = context[host]
 
   if not upstream then
     return nil, 'missing upstream'
@@ -19,8 +24,6 @@ function _M:call(context, bal)
   if context[upstream] then
     return nil, 'already set peer'
   end
-
-  local host = ngx.var.proxy_host -- NYI: return to lower frame
 
   if host ~= upstream.upstream_name then
     ngx.log(ngx.ERR, 'upstream name: ', upstream.name, ' does not match proxy host: ', host)
