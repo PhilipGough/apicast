@@ -14,8 +14,6 @@ local Usage = require('apicast.usage')
 local errors = require('apicast.errors')
 local Upstream = require('apicast.upstream')
 
-local resty_url = require 'resty.url'
-
 local assert = assert
 local type = type
 local insert = table.insert
@@ -42,8 +40,6 @@ do
     ngx.log(ngx.WARN, 'using experimental asynchronous reporting threads: ', reporting_threads)
   end
 end
-
-local empty = {}
 
 local _M = { }
 
