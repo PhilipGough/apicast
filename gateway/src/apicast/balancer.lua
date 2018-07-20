@@ -14,7 +14,7 @@ function _M:call(context, bal)
   end
 
   local host = ngx.var.proxy_host
-  local balancer = bal or _M.default_balancer
+  local balancer = bal or self.default_balancer
   local upstream = context[host]
 
   if not upstream then
