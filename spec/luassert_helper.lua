@@ -88,10 +88,9 @@ do -- adding assert.returns_error(error_text, ok, ret) : assert.returns_error('n
   end
 
   local function contains(state, arguments, level)
-    local level = (level or 1) + 1
     local argcnt = arguments.n
 
-    assert(argcnt > 1, s("assertion.internal.argtolittle", { "same", 2, tostring(argcnt) }), level)
+    assert(argcnt > 1, s("assertion.internal.argtolittle", { "same", 2, tostring(argcnt) }), (level or 1) + 1)
 
     local expected = arguments[1]
     local actual = arguments[2]
