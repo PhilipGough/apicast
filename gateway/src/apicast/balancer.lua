@@ -1,3 +1,4 @@
+local assert = assert
 local round_robin = require 'resty.balancer.round_robin'
 local resty_url = require 'resty.url'
 
@@ -8,13 +9,12 @@ local function exit_service_unavailable()
   ngx.exit(ngx.status)
 end
 
-function _M:call(context, bal)
+local function get_upstream(context)
   if not context then
     return nil, 'missing context'
   end
 
   local host = ngx.var.proxy_host
-  local balancer = bal or self.default_balancer
   local upstream = context[host]
 
   if not upstream then
@@ -30,23 +30,45 @@ function _M:call(context, bal)
     return nil, 'upstream host mismatch'
   end
 
+  return upstream
+end
+
+local function get_peer(balancer, upstream)
   local peers = balancer:peers(upstream.servers)
   local peer, err = balancer:select_peer(peers)
 
   if not peer then
     ngx.log(ngx.ERR, 'could not select peer: ', err)
-    return exit_service_unavailable(), err
+    exit_service_unavailable()
+    return nil, err
   end
 
-  local address, port = peer[1], peer[2]
-
-  if not address then
+  if not peer[1] then
     ngx.log(ngx.ERR, 'peer missing address')
-    return exit_service_unavailable(), 'no address'
+    exit_service_unavailable()
+    return nil, 'no address'
   end
 
-  local ok
-  ok, err = balancer:set_current_peer(address, port or upstream.uri.port or resty_url.default_port(upstream.uri.scheme))
+  return peer
+end
+
+function _M.call(self, context, bal)
+  local balancer = assert(bal or _M.default_balancer, 'missing balancer')
+  local upstream, peer, err, ok
+
+  upstream, err = get_upstream(context)
+
+  if err then
+    return nil, err
+  end
+
+  peer, err = get_peer(balancer, upstream)
+
+  if err then
+    return nil, err
+  end
+
+  ok, err = balancer:set_current_peer(peer[1], peer[2] or upstream.uri.port or resty_url.default_port(upstream.uri.scheme))
 
   if ok then
     -- I wish there would be a nicer way, but unfortunately ngx.exit(ngx.OK) does not
@@ -55,7 +77,8 @@ function _M:call(context, bal)
     return peer
   else
     ngx.log(ngx.ERR, 'failed to set current backend peer: ', err)
-    return exit_service_unavailable(), err
+    exit_service_unavailable()
+    return nil, err
   end
 end
 
