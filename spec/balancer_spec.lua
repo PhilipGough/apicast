@@ -12,7 +12,7 @@ describe('apicast.balancer', function()
 
     it('sets default port from scheme if no port is specified for peers', function()
       local balancer = setmetatable({
-        set_current_peer = spy.new(function(...) return true end),
+        set_current_peer = spy.new(function() return true end),
       }, { __index = apicast_balancer.default_balancer })
       local upstream = Upstream.new('https://127.0.0.2')
 
