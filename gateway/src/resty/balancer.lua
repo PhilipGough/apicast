@@ -133,7 +133,7 @@ function _M.set_peer(self, peers)
       return nil, err
     end
   else
-    return nil, 'no peer found'
+    return nil, err or 'no peer found'
   end
 end
 

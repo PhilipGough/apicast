@@ -57,7 +57,7 @@ describe('resty.balancer', function()
   describe(':set_current_peer', function()
     it('returns ok when it sets the peer', function()
       local test = resty_balancer.new(function(peers) return peers[1] end)
-      local set_current_peer = stub.new(test.balancer, 'set_current_peer', function(...) return true end)
+      local set_current_peer = stub.new(test.balancer, 'set_current_peer', function() return true end)
 
       assert(test:set_current_peer('127.0.0.1', 8080))
 
