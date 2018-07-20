@@ -76,6 +76,14 @@ function _M:resolve()
     return servers
 end
 
+function _M:port()
+    if not self or not self.uri then
+        return nil, 'not initialized'
+    end
+
+    return self.uri.port or resty_url.default_port(self.uri.scheme)
+end
+
 function _M:rewrite(host)
     ngx.req.set_header('Host', host or self.uri.host)
 end

@@ -51,9 +51,9 @@ describe('Proxy', function()
     before_each(function() get_upstream = proxy.get_upstream end)
 
     it('sets correct upstream port', function()
-      assert.same(443, get_upstream({ api_backend = 'https://example.com' }).port)
-      assert.same(80, get_upstream({ api_backend = 'http://example.com' }).port)
-      assert.same(8080, get_upstream({ api_backend = 'http://example.com:8080' }).port)
+      assert.same(443, get_upstream({ api_backend = 'https://example.com' }):port())
+      assert.same(80, get_upstream({ api_backend = 'http://example.com' }):port())
+      assert.same(8080, get_upstream({ api_backend = 'http://example.com:8080' }):port())
     end)
   end)
 
