@@ -8,7 +8,6 @@ describe('Upstream policy', function()
   local test_upstream_matched_host = 'localhost'
   local test_upstream_matched = string.format("http://%s/a_path:8080",
     test_upstream_matched_host)
-  local test_upstream_matched_proxy_pass = 'http://upstream/a_path:8080'
   local test_upstream_not_matched = 'http://localhost/a_path:80'
 
   local test_upstream_matched_url = {

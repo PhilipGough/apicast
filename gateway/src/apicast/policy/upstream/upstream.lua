@@ -2,7 +2,6 @@
 -- This policy allows to modify the host of a request based on its path.
 
 local Upstream = require('apicast.upstream')
-local format = string.format
 local ipairs = ipairs
 local match = ngx.re.match
 local tab_insert = table.insert
